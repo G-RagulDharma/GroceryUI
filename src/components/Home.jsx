@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Apple, ChevronDown, Ham, Coffee, Cat, SprayCan, Candy, CookingPot, Soup, Wine, ShoppingCart, ShoppingBag, X, Menu } from "lucide-react";
+import { Apple, ChevronDown, Ham, Coffee, Cat, SprayCan, Candy, CookingPot, Soup, Wine, MessageCircleX, ShoppingCart, ShoppingBag, X, Menu } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 
@@ -45,7 +45,7 @@ const Home = () => {
 
                 const response = await fetch(url);
                 const data = await response.json();
-                // Filter products to ensure they belong to the "groceries" category
+
                 const filteredData = (searchTerm || selectedCategory)
                     ? (data.products || []).filter(product => product.category === "groceries")
                     : data.products || [];
@@ -139,20 +139,20 @@ const Home = () => {
 
     const handleSearchChange = (e) => {
         setSearchTerm(e.target.value);
-        setSelectedCategory(""); // Clear category filter when searching
-        setSkip(0); // Reset pagination
+        setSelectedCategory("");
+        setSkip(0);
     };
 
     const handleSearchSubmit = (e) => {
         e.preventDefault();
-        setSkip(0); // Reset pagination
+        setSkip(0);
     };
 
     const handleCategorySelect = (category) => {
         setSelectedCategory(category);
-        setSearchTerm(""); // Clear search term when selecting a category
-        setSkip(0); // Reset pagination
-        setIsSidebarOpen(false); // Close sidebar on mobile
+        setSearchTerm("");
+        setSkip(0);
+        setIsSidebarOpen(false);
     };
 
     return (
@@ -328,6 +328,15 @@ const Home = () => {
                                     onChange={handleSearchChange}
                                     required
                                 />
+                                {/* Clear Search Button */}
+                                {searchTerm && (
+                                    <button
+                                        className="absolute right-24 top-2 text-sm text-gray-600 hover:text-gray-800 cursor-pointer"
+                                        onClick={() => setSearchTerm("")}
+                                    >
+                                        <span className="text-red-400 flex"><MessageCircleX /></span>
+                                    </button>
+                                )}
                                 <button type="submit" className="absolute inset-y-0 end-0 flex items-center">
                                     <div className="inline-flex items-center py-2 px-2 sm:py-2.5 sm:px-3 text-xs sm:text-sm font-medium text-white bg-green-700 rounded-r-lg border border-green-700 hover:bg-green-800 focus:ring-4 focus:outline-none focus:ring-green-300">
                                         <svg
@@ -350,15 +359,7 @@ const Home = () => {
                                 </button>
                             </div>
                         </form>
-                        {/* Clear Search Button */}
-                        {searchTerm && (
-                            <button
-                                className="mt-2 text-sm text-gray-600 hover:text-gray-800"
-                                onClick={() => setSearchTerm("")}
-                            >
-                                Clear Search
-                            </button>
-                        )}
+
                     </div>
                 </div>
 
@@ -411,8 +412,13 @@ const Home = () => {
                             <ul className="space-y-2 font-medium">
                                 {selectedCategory && (
                                     <li>
-                                        <button onClick={() => setSelectedCategory("")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">
-                                            Clear Category
+                                        <button
+                                            onClick={() => setSelectedCategory("")}
+                                            className="inline-block p-2 text-red-400 rounded-lg text-right"
+                                        >
+                                            <span className="flex items-center justify-end cursor-pointer">
+                                                <MessageCircleX className="w-5 h-5 mr-1" /> Clear
+                                            </span>
                                         </button>
                                     </li>
                                 )}
