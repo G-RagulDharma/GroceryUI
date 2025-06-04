@@ -1,14 +1,32 @@
 import React, { useEffect, useState } from "react";
 import { Apple, ChevronDown, Ham, Coffee, Cat, SprayCan, Candy, CookingPot, Soup, Wine, ShoppingCart, ShoppingBag, X, Menu } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
+import Swal from 'sweetalert2';
 
 const Home = () => {
     const [products, setProducts] = useState([]);
     const [cart, setCart] = useState({});
     const [hoveredProductId, setHoveredProductId] = useState(null);
     const [isCartOpen, setIsCartOpen] = useState(false);
-    const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [savedOffers, setSavedOffers] = useState({
+        express: false,
+        cash: false,
+        gift: false,
+    });
+    const [openDropdowns, setOpenDropdowns] = useState({
+        fruits: false,
+        meat: false,
+        snacks: false,
+        pet: false,
+        home: false,
+        dairy: false,
+        cooking: false,
+        breakfast: false,
+        beverage: false,
+    });
+    const [searchTerm, setSearchTerm] = useState("");
+    const [selectedCategory, setSelectedCategory] = useState("");
     const navigate = useNavigate();
     const [skip, setSkip] = useState(0);
     const limit = 4;
@@ -16,19 +34,35 @@ const Home = () => {
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const response = await fetch(`https://dummyjson.com/products/category/groceries?limit=${limit}&skip=${skip}`);
-                const data = await response.json();
-                if (skip === 0) {
-                    setProducts(data.products || []);
+                let url;
+                if (searchTerm) {
+                    url = `https://dummyjson.com/products/search?q=${encodeURIComponent(searchTerm)}&limit=${limit}&skip=${skip}`;
+                } else if (selectedCategory) {
+                    url = `https://dummyjson.com/products/search?q=${encodeURIComponent(selectedCategory)}&limit=${limit}&skip=${skip}`;
                 } else {
-                    setProducts((prevProducts) => [...prevProducts, ...(data.products || [])]);
+                    url = `https://dummyjson.com/products/category/groceries?limit=${limit}&skip=${skip}`;
+                }
+
+                const response = await fetch(url);
+                const data = await response.json();
+                // Filter products to ensure they belong to the "groceries" category
+                const filteredData = (searchTerm || selectedCategory)
+                    ? (data.products || []).filter(product => product.category === "groceries")
+                    : data.products || [];
+
+                if (skip === 0) {
+                    setProducts(filteredData);
+                } else {
+                    setProducts((prevProducts) => [...prevProducts, ...filteredData]);
                 }
             } catch (error) {
                 console.error("Error fetching products:", error);
             }
         };
         fetchProducts();
-    }, [skip]);
+    }, [skip, searchTerm, selectedCategory]);
+
+    const filteredProducts = products;
 
     const handleLoadMore = () => {
         setSkip((prevSkip) => prevSkip + limit);
@@ -80,6 +114,46 @@ const Home = () => {
         navigate('/checkout', { state: { cart, cartSummary } });
     };
 
+    const handleSaveOffer = (offerType) => {
+        setSavedOffers((prev) => ({
+            ...prev,
+            [offerType]: true,
+        }));
+
+        const offerName = offerType === 'express' ? 'Express Delivery' : offerType === 'cash' ? 'Cash On Delivery' : 'Gift Voucher';
+
+        Swal.fire({
+            title: 'Success!',
+            text: `${offerName} offer saved!`,
+            icon: 'success',
+            confirmButtonText: 'OK',
+        });
+    };
+
+    const toggleDropdown = (category) => {
+        setOpenDropdowns((prev) => ({
+            ...prev,
+            [category]: !prev[category],
+        }));
+    };
+
+    const handleSearchChange = (e) => {
+        setSearchTerm(e.target.value);
+        setSelectedCategory(""); // Clear category filter when searching
+        setSkip(0); // Reset pagination
+    };
+
+    const handleSearchSubmit = (e) => {
+        e.preventDefault();
+        setSkip(0); // Reset pagination
+    };
+
+    const handleCategorySelect = (category) => {
+        setSelectedCategory(category);
+        setSearchTerm(""); // Clear search term when selecting a category
+        setSkip(0); // Reset pagination
+        setIsSidebarOpen(false); // Close sidebar on mobile
+    };
 
     return (
         <div className="min-h-screen w-full overflow-y-auto">
@@ -204,12 +278,12 @@ const Home = () => {
                                     <img src={product.thumbnail} alt={product.title} className="w-10 h-10 object-cover rounded" />
                                     <div className="py-4 px-2">
                                         <p className="text-sm font-medium py-1">{product.title}</p>
-                                        <p className="text-sm text-green-400">${product.price}</p>
-                                        <p className="text-xs text-gray-500 py-1">{quantity} x {product.weight || '1lb'}</p>
+                                        <p className="text-sm text-green-400">${(product.price * (1 - product.discountPercentage / 100)).toFixed(2)}</p>
+                                        <p className="text-xs text-gray-500 py-1">{quantity} x {product.weight + 'W' || '1lb'}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center space-x-2">
-                                    <p className="text-sm font-semibold">${(product.price * (1 - product.discountPercentage / 100)).toFixed(2)}</p>
+                                    <p className="text-sm font-semibold">${quantity * (product.price * (1 - product.discountPercentage / 100)).toFixed(2)}</p>
                                     <button
                                         onClick={() => handleRemoveFromCart(product.id)}
                                         className="text-gray-500 hover:text-gray-700 cursor-pointer"
@@ -224,7 +298,7 @@ const Home = () => {
                     )}
                     <div className="absolute bottom-4 left-0 right-0 px-4">
                         <button
-                            className="w-full bg-[#057A55] text-white py-2 rounded-full flex justify-between items-center px-4"
+                            className="w-full bg-[#057A55] text-white py-2 rounded-full flex justify-between items-center px-4 cursor-pointer"
                             onClick={handleCheckout}
                             disabled={Object.values(cart).length === 0}
                         >
@@ -243,13 +317,15 @@ const Home = () => {
                     <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center max-w-lg w-full px-4 text-center">
                         <h3 className="text-lg sm:text-2xl font-bold text-gray-800">Groceries Delivered in 90 Minutes</h3>
                         <p className="text-xs sm:text-sm text-gray-600 mb-4">Get your healthy foods & snacks delivered at your doorsteps all day every day</p>
-                        <form className="flex items-center w-full">
+                        <form className="flex items-center w-full" onSubmit={handleSearchSubmit}>
                             <div className="relative w-full">
                                 <input
                                     type="text"
                                     id="voice-search"
                                     className="bg-gray-50 border border-gray-300 text-gray-900 text-xs sm:text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full ps-8 sm:ps-10 p-2 sm:p-2.5"
                                     placeholder="Search your products from here"
+                                    value={searchTerm}
+                                    onChange={handleSearchChange}
                                     required
                                 />
                                 <button type="submit" className="absolute inset-y-0 end-0 flex items-center">
@@ -274,19 +350,57 @@ const Home = () => {
                                 </button>
                             </div>
                         </form>
+                        {/* Clear Search Button */}
+                        {searchTerm && (
+                            <button
+                                className="mt-2 text-sm text-gray-600 hover:text-gray-800"
+                                onClick={() => setSearchTerm("")}
+                            >
+                                Clear Search
+                            </button>
+                        )}
                     </div>
                 </div>
 
                 <div className="flex flex-col sm:flex-row w-full gap-4 p-4">
-                    <img src="/Express.jpg" className="h-32 sm:h-40 w-full sm:w-1/3 object-cover" />
-                    <img src="/Cash.jpg" className="h-32 sm:h-40 w-full sm:w-1/3 object-cover" />
-                    <img src="/Gift.jpg" className="h-32 sm:h-40 w-full sm:w-1/3 object-cover" />
+                    {/* Express Delivery */}
+                    <div className="relative h-32 sm:h-40 w-full sm:w-1/3">
+                        <img
+                            src={savedOffers.express ? '/ExpressSaved.png' : '/Express.jpg'}
+                            className="h-full w-full object-cover"
+                            alt="Express Delivery"
+                            onClick={() => !savedOffers.express && handleSaveOffer('express')}
+                            style={{ cursor: savedOffers.express ? 'default' : 'pointer' }}
+                        />
+                    </div>
+
+                    {/* Cash On Delivery */}
+                    <div className="relative h-32 sm:h-40 w-full sm:w-1/3">
+                        <img
+                            src={savedOffers.cash ? '/CashSaved.png' : '/Cash.jpg'}
+                            className="h-full w-full object-cover"
+                            alt="Cash On Delivery"
+                            onClick={() => !savedOffers.cash && handleSaveOffer('cash')}
+                            style={{ cursor: savedOffers.cash ? 'default' : 'pointer' }}
+                        />
+                    </div>
+
+                    {/* Gift Voucher */}
+                    <div className="relative h-32 sm:h-40 w-full sm:w-1/3">
+                        <img
+                            src={savedOffers.gift ? '/GiftSaved.png' : '/Gift.jpg'}
+                            className="h-full w-full object-cover"
+                            alt="Gift Voucher"
+                            onClick={() => !savedOffers.gift && handleSaveOffer('gift')}
+                            style={{ cursor: savedOffers.gift ? 'default' : 'pointer' }}
+                        />
+                    </div>
                 </div>
 
                 {/* Sidebar and Products */}
                 <div className="flex flex-1 pt-4 bg-gray-100">
                     {/* Sidebar */}
-                    <aside className={`fixed sm:static top-0 left-0 z-40 w-64 h-full sm:h-fit bg-white shadow-lg transition-transform ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} sm:translate-x-0`}>
+                    <aside className={`fixed sm:static top-0 left-0 z-40 w-64 h-full sm:h-fit bg-white shadow-lg transition-transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} sm:translate-x-0`}>
                         <div className="h-full px-3 py-4 overflow-y-auto">
                             <div className="flex justify-between items-center mb-4 sm:hidden">
                                 <h3 className="text-lg font-bold">Categories</h3>
@@ -295,78 +409,170 @@ const Home = () => {
                                 </button>
                             </div>
                             <ul className="space-y-2 font-medium">
-                                <li className="flex items-center">
-                                    <Apple className="w-5 h-5 flex-shrink-0" />
-                                    <a href="#" className="flex items-center p-2 text-gray-900 rounded-lg flex-1">
-                                        <span className="ml-3 flex-1">Fruits & Vegetables</span>
-                                        <ChevronDown className="w-5 h-5 flex-shrink-0 ml-2" />
-                                    </a>
+                                {selectedCategory && (
+                                    <li>
+                                        <button onClick={() => setSelectedCategory("")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">
+                                            Clear Category
+                                        </button>
+                                    </li>
+                                )}
+                                <li>
+                                    <div className="flex items-center">
+                                        <Apple className="w-5 h-5 flex-shrink-0" />
+                                        <button onClick={() => toggleDropdown('fruits')} className="flex items-center p-2 text-gray-900 rounded-lg flex-1">
+                                            <span className="ml-3 flex-1 text-left">Fruits & Vegetables</span>
+                                            <ChevronDown className={`w-5 h-5 flex-shrink-0 ml-2 transition-transform ${openDropdowns.fruits ? 'rotate-180' : ''}`} />
+                                        </button>
+                                    </div>
+                                    {openDropdowns.fruits && (
+                                        <ul className="pl-8 space-y-1 mt-1">
+                                            <li><button onClick={() => handleCategorySelect("Apple")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Apple</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Mango")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Mango</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Banana")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Banana</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Carrot")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Carrot</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Broccoli")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Broccoli</button></li>
+                                        </ul>
+                                    )}
                                 </li>
-                                <li className="flex items-center">
-                                    <Ham className="w-5 h-5 flex-shrink-0" />
-                                    <a href="#" className="flex items-center p-2 text-gray-900 rounded-lg flex-1">
-                                        <span className="ml-3 flex-1">Meat & Fish</span>
-                                        <ChevronDown className="w-5 h-5 flex-shrink-0 ml-2" />
-                                    </a>
+                                <li>
+                                    <div className="flex items-center">
+                                        <Ham className="w-5 h-5 flex-shrink-0" />
+                                        <button onClick={() => toggleDropdown('meat')} className="flex items-center p-2 text-gray-900 rounded-lg flex-1">
+                                            <span className="ml-3 flex-1 text-left">Meat & Fish</span>
+                                            <ChevronDown className={`w-5 h-5 flex-shrink-0 ml-2 transition-transform ${openDropdowns.meat ? 'rotate-180' : ''}`} />
+                                        </button>
+                                    </div>
+                                    {openDropdowns.meat && (
+                                        <ul className="pl-8 space-y-1 mt-1">
+                                            <li><button onClick={() => handleCategorySelect("Chicken")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Chicken</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Beef")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Beef</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Salmon")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Salmon</button></li>
+                                        </ul>
+                                    )}
                                 </li>
-                                <li className="flex items-center">
-                                    <Coffee className="w-5 h-5 flex-shrink-0" />
-                                    <a href="#" className="flex items-center p-2 text-gray-900 rounded-lg flex-1">
-                                        <span className="ml-3 flex-1">Snacks</span>
-                                        <ChevronDown className="w-5 h-5 flex-shrink-0 ml-2" />
-                                    </a>
+                                <li>
+                                    <div className="flex items-center">
+                                        <Coffee className="w-5 h-5 flex-shrink-0" />
+                                        <button onClick={() => toggleDropdown('snacks')} className="flex items-center p-2 text-gray-900 rounded-lg flex-1">
+                                            <span className="ml-3 flex-1 text-left">Snacks</span>
+                                            <ChevronDown className={`w-5 h-5 flex-shrink-0 ml-2 transition-transform ${openDropdowns.snacks ? 'rotate-180' : ''}`} />
+                                        </button>
+                                    </div>
+                                    {openDropdowns.snacks && (
+                                        <ul className="pl-8 space-y-1 mt-1">
+                                            <li><button onClick={() => handleCategorySelect("Chips")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Chips</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Cookies")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Cookies</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Nuts")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Nuts</button></li>
+                                        </ul>
+                                    )}
                                 </li>
-                                <li className="flex items-center">
-                                    <Cat className="w-5 h-5 flex-shrink-0" />
-                                    <a href="#" className="flex items-center p-2 text-gray-900 rounded-lg flex-1">
-                                        <span className="ml-3 flex-1">Pet Care</span>
-                                        <ChevronDown className="w-5 h-5 flex-shrink-0 ml-2" />
-                                    </a>
+                                <li>
+                                    <div className="flex items-center">
+                                        <Cat className="w-5 h-5 flex-shrink-0" />
+                                        <button onClick={() => toggleDropdown('pet')} className="flex items-center p-2 text-gray-900 rounded-lg flex-1">
+                                            <span className="ml-3 flex-1 text-left">Pet Care</span>
+                                            <ChevronDown className={`w-5 h-5 flex-shrink-0 ml-2 transition-transform ${openDropdowns.pet ? 'rotate-180' : ''}`} />
+                                        </button>
+                                    </div>
+                                    {openDropdowns.pet && (
+                                        <ul className="pl-8 space-y-1 mt-1">
+                                            <li><button onClick={() => handleCategorySelect("Dog Food")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Dog Food</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Cat Litter")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Cat Litter</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Pet Toys")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Pet Toys</button></li>
+                                        </ul>
+                                    )}
                                 </li>
-                                <li className="flex items-center">
-                                    <SprayCan className="w-5 h-5 flex-shrink-0" />
-                                    <a href="#" className="flex items-center p-2 text-gray-900 rounded-lg flex-1">
-                                        <span className="ml-3 flex-1">Home & Cleaning</span>
-                                        <ChevronDown className="w-5 h-5 flex-shrink-0 ml-2" />
-                                    </a>
+                                <li>
+                                    <div className="flex items-center">
+                                        <SprayCan className="w-5 h-5 flex-shrink-0" />
+                                        <button onClick={() => toggleDropdown('home')} className="flex items-center p-2 text-gray-900 rounded-lg flex-1">
+                                            <span className="ml-3 flex-1 text-left">Home & Cleaning</span>
+                                            <ChevronDown className={`w-5 h-5 flex-shrink-0 ml-2 transition-transform ${openDropdowns.home ? 'rotate-180' : ''}`} />
+                                        </button>
+                                    </div>
+                                    {openDropdowns.home && (
+                                        <ul className="pl-8 space-y-1 mt-1">
+                                            <li><button onClick={() => handleCategorySelect("Detergent")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Detergent</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Dish Soap")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Dish Soap</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Trash Bags")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Trash Bags</button></li>
+                                        </ul>
+                                    )}
                                 </li>
-                                <li className="flex items-center">
-                                    <Candy className="w-5 h-5 flex-shrink-0" />
-                                    <a href="#" className="flex items-center p-2 text-gray-900 rounded-lg flex-1">
-                                        <span className="ml-3 flex-1">Dairy</span>
-                                        <ChevronDown className="w-5 h-5 flex-shrink-0 ml-2" />
-                                    </a>
+                                <li>
+                                    <div className="flex items-center">
+                                        <Candy className="w-5 h-5 flex-shrink-0 " />
+                                        <button onClick={() => toggleDropdown('dairy')} className="flex items-center p-2 text-gray-900 rounded-lg flex-1">
+                                            <span className="ml-3 flex-1 text-left">Dairy</span>
+                                            <ChevronDown className={`w-5 h-5 flex-shrink-0 ml-2 transition-transform ${openDropdowns.dairy ? 'rotate-180' : ''}`} />
+                                        </button>
+                                    </div>
+                                    {openDropdowns.dairy && (
+                                        <ul className="pl-8 space-y-1 mt-1">
+                                            <li><button onClick={() => handleCategorySelect("Milk")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Milk</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Cheese")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Cheese</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Yogurt")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Yogurt</button></li>
+                                        </ul>
+                                    )}
                                 </li>
-                                <li className="flex items-center">
-                                    <CookingPot className="w-5 h-5 flex-shrink-0" />
-                                    <a href="#" className="flex items-center p-2 text-gray-900 rounded-lg flex-1">
-                                        <span className="ml-3 flex-1">Cooking</span>
-                                        <ChevronDown className="w-5 h-5 flex-shrink-0 ml-2" />
-                                    </a>
+                                <li>
+                                    <div className="flex items-center">
+                                        <CookingPot className="w-5 h-5 flex-shrink-0" />
+                                        <button onClick={() => toggleDropdown('cooking')} className="flex items-center p-2 text-gray-900 rounded-lg flex-1">
+                                            <span className="ml-3 flex-1 text-left">Cooking</span>
+                                            <ChevronDown className={`w-5 h-5 flex-shrink-0 ml-2 transition-transform ${openDropdowns.cooking ? 'rotate-180' : ''}`} />
+                                        </button>
+                                    </div>
+                                    {openDropdowns.cooking && (
+                                        <ul className="pl-8 space-y-1 mt-1">
+                                            <li><button onClick={() => handleCategorySelect("Olive Oil")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Olive Oil</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Spices")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Spices</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Pasta")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Pasta</button></li>
+                                        </ul>
+                                    )}
                                 </li>
-                                <li className="flex items-center">
-                                    <Soup className="w-5 h-5 flex-shrink-0" />
-                                    <a href="#" className="flex items-center p-2 text-gray-900 rounded-lg flex-1">
-                                        <span className="ml-3 flex-1">Breakfast</span>
-                                        <ChevronDown className="w-5 h-5 flex-shrink-0 ml-2" />
-                                    </a>
+                                <li>
+                                    <div className="flex items-center">
+                                        <Soup className="w-5 h-5 flex-shrink-0" />
+                                        <button onClick={() => toggleDropdown('breakfast')} className="flex items-center p-2 text-gray-900 rounded-lg flex-1">
+                                            <span className="ml-3 flex-1 text-left">Breakfast</span>
+                                            <ChevronDown className={`w-5 h-5 flex-shrink-0 ml-2 transition-transform ${openDropdowns.breakfast ? 'rotate-180' : ''}`} />
+                                        </button>
+                                    </div>
+                                    {openDropdowns.breakfast && (
+                                        <ul className="pl-8 space-y-1 mt-1">
+                                            <li><button onClick={() => handleCategorySelect("Cereal")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Cereal</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Bread")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Bread</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Jam")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Jam</button></li>
+                                        </ul>
+                                    )}
                                 </li>
-                                <li className="flex items-center">
-                                    <Wine className="w-5 h-5 flex-shrink-0" />
-                                    <a href="#" className="flex items-center p-2 text-gray-900 rounded-lg flex-1">
-                                        <span className="ml-3 flex-1">Beverage</span>
-                                        <ChevronDown className="w-5 h-5 flex-shrink-0 ml-2" />
-                                    </a>
+                                <li>
+                                    <div className="flex items-center">
+                                        <Wine className="w-5 h-5 flex-shrink-0" />
+                                        <button onClick={() => toggleDropdown('beverage')} className="flex items-center p-2 text-gray-900 rounded-lg flex-1">
+                                            <span className="ml-3 flex-1 text-left">Beverage</span>
+                                            <ChevronDown className="ml-2 transition-transform ${openDropdowns.beverage ? 'rotate-180' : ''} w-5 h-5 flex-shrink-0 ml-2" />
+                                        </button>
+                                    </div>
+                                    {openDropdowns.beverage && (
+                                        <ul className="pl-8 space-y-1 mt-1">
+                                            <li><button onClick={() => handleCategorySelect("Coffee")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Coffee</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Tea")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Tea</button></li>
+                                            <li><button onClick={() => handleCategorySelect("Juice")} className="block p-2 text-gray-700 hover:bg-gray-100 rounded-lg w-full text-left">Juice</button></li>
+                                        </ul>
+                                    )}
                                 </li>
                             </ul>
+
+
                         </div>
                     </aside>
 
                     {/* Main Product Grid */}
                     <main className="flex-1 pt-4 px-4 sm:ml-10">
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
-                            {products.length > 0 ? (
-                                products.map((product) => {
+                            {filteredProducts.length > 0 ? (
+                                filteredProducts.map((product) => {
                                     const discountedPrice = (product.price * (1 - product.discountPercentage / 100)).toFixed(2);
                                     const quantityInCart = cart[product.id]?.quantity || 0;
                                     const isHovered = hoveredProductId === product.id;
@@ -389,11 +595,9 @@ const Home = () => {
                                             <div className="flex w-full items-center justify-between p-2 sm:p-3 relative group">
                                                 <div className="flex flex-col space-y-1 sm:space-y-2">
                                                     <span className="text-xs sm:text-sm font-medium text-gray-700">{product.title}</span>
-                                                    {
-
-                                                        product.discountPercentage > 0 && (
-                                                            <span className="text-xs text-gray-500 line-through">${product.price.toFixed(2)}</span>
-                                                        )}
+                                                    {product.discountPercentage > 0 && (
+                                                        <span className="text-xs text-gray-500 line-through">${product.price.toFixed(2)}</span>
+                                                    )}
                                                     <span className="text-xs sm:text-sm font-semibold text-green-600">${discountedPrice}</span>
                                                 </div>
                                                 <div
@@ -435,12 +639,12 @@ const Home = () => {
                                 })
                             ) : (
                                 <p className="text-center col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-4">
-                                    {products.length === 0 ? "Failed to load products" : "Loading products..."}
+                                    {products.length === 0 ? "Failed to load products" : "No products match your search or category"}
                                 </p>
                             )}
                         </div>
                         <div className="flex justify-center m-2">
-                            {products.length > 0 && (
+                            {filteredProducts.length > 0 && (
                                 <button
                                     onClick={handleLoadMore}
                                     className="mt-4 px-4 py-2 bg-[#057A55] text-white rounded hover:bg-green-600 cursor-pointer text-sm sm:text-base"
@@ -451,8 +655,8 @@ const Home = () => {
                         </div>
                     </main>
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };
 
