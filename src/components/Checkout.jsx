@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { X, Apple, ChevronDown } from "lucide-react";
+import { X, Apple, ChevronDown, Trash2 } from "lucide-react";
 import Swal from "sweetalert2";
 
 const Checkout = () => {
@@ -131,6 +131,19 @@ const Checkout = () => {
     setContacts(newContacts);
   };
 
+  const removeContact = (index) => {
+    if (contacts.length === 1) {
+      Swal.fire({
+        title: "Cannot Delete",
+        text: "At least one contact number is required.",
+        icon: "warning",
+        confirmButtonText: "OK",
+      });
+      return;
+    }
+    setContacts(contacts.filter((_, i) => i !== index));
+  };
+
   const addAddress = (type) => {
     if (type === "billing") {
       setBillingAddresses([...billingAddresses, { street: "", city: "", state: "", zip: "" }]);
@@ -148,6 +161,32 @@ const Checkout = () => {
       const newAddresses = [...shippingAddresses];
       newAddresses[index][field] = value;
       setShippingAddresses(newAddresses);
+    }
+  };
+
+  const removeAddress = (type, index) => {
+    if (type === "billing") {
+      if (billingAddresses.length === 1) {
+        Swal.fire({
+          title: "Cannot Delete",
+          text: "At least one billing address is required.",
+          icon: "warning",
+          confirmButtonText: "OK",
+        });
+        return;
+      }
+      setBillingAddresses(billingAddresses.filter((_, i) => i !== index));
+    } else {
+      if (shippingAddresses.length === 1) {
+        Swal.fire({
+          title: "Cannot Delete",
+          text: "At least one shipping address is required.",
+          icon: "warning",
+          confirmButtonText: "OK",
+        });
+        return;
+      }
+      setShippingAddresses(shippingAddresses.filter((_, i) => i !== index));
     }
   };
 
@@ -227,6 +266,13 @@ const Checkout = () => {
                   title="Phone number must be exactly 10 digits"
                   className="ml-2 w-full outline-none"
                 />
+                <button
+                  onClick={() => removeContact(index)}
+                  className="ml-2 text-red-500 hover:text-red-700"
+                  title="Delete contact"
+                >
+                  <Trash2 size={20} />
+                </button>
               </div>
             ))}
           </div>
@@ -257,7 +303,7 @@ const Checkout = () => {
               <p className="text-gray-500">No Address Found</p>
             ) : (
               billingAddresses.map((address, index) => (
-                <div key={index} className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div key={index} className="relative grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <input
                     type="text"
                     placeholder="Street"
@@ -286,6 +332,13 @@ const Checkout = () => {
                     onChange={(e) => updateAddress("billing", index, "zip", e.target.value)}
                     className="w-full border rounded-lg p-2 outline-none"
                   />
+                  <button
+                    onClick={() => removeAddress("billing", index)}
+                    className="absolute bottom-2 -right-5 text-red-500 hover:text-red-700 cursor-pointer"
+                    title="Delete billing address"
+                  >
+                    <Trash2 size={20} />
+                  </button>
                 </div>
               ))
             )}
@@ -303,7 +356,7 @@ const Checkout = () => {
               <p className="text-gray-500">No Address Found</p>
             ) : (
               shippingAddresses.map((address, index) => (
-                <div key={index} className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div key={index} className="relative grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <input
                     type="text"
                     placeholder="Street"
@@ -332,6 +385,13 @@ const Checkout = () => {
                     onChange={(e) => updateAddress("shipping", index, "zip", e.target.value)}
                     className="w-full border rounded-lg p-2 outline-none"
                   />
+                  <button
+                    onClick={() => removeAddress("shipping", index)}
+                    className="absolute bottom-2 -right-5 text-red-500 hover:text-red-700 cursor-pointer"
+                    title="Delete shipping address"
+                  >
+                    <Trash2 size={20} />
+                  </button>
                 </div>
               ))
             )}
